@@ -1,36 +1,34 @@
 import os
 import glob
-
 from setuptools import find_packages, setup
 
-# A special env var that allows us to disable the installation of the default extras for advanced users / containers / etc
+# Check if default extras should be installed based on an environment variable
 MINDSDB_PIP_INSTALL_DEFAULT_EXTRAS = (
-    True
-    if os.getenv("MINDSDB_PIP_INSTALL_DEFAULT_EXTRAS", "true").lower() == "true"
-    else False
+    True if os.getenv("MINDSDB_PIP_INSTALL_DEFAULT_EXTRAS", "true").lower() == "true" else False
 )
+
+# Read default handler dependencies from a file
 DEFAULT_PIP_EXTRAS = [
     line.split("#")[0].rstrip()
     for line in open("default_handlers.txt").read().splitlines()
     if not line.strip().startswith("#")
 ]
 
-
+# Class to store dependencies information
 class Deps:
     pkgs = []
     pkgs_exclude = ["tests", "tests.*"]
     new_links = []
     extras = {}
 
-
+# Read package metadata
 about = {}
 with open("mindsdb/__about__.py") as fp:
     exec(fp.read(), about)
 
-
+# Read the long description from README.md
 with open("README.md", "r", encoding="utf8") as fh:
     long_description = fh.read()
-
 
 def expand_requirements_links(requirements: list) -> list:
     """Expand requirements that contain links to other requirement files"""
@@ -53,27 +51,8 @@ def expand_requirements_links(requirements: list) -> list:
 
     return list(set(requirements))  # Remove duplicates
 
-
 def define_deps():
-    """Reads requirements.txt requirements-extra.txt files and preprocess it
-    to be feed into setuptools.
-
-    This is the only possible way (we found)
-    how requirements.txt can be reused in setup.py
-    using dependencies from private github repositories.
-
-    Links must be appendend by `-{StringWithAtLeastOneNumber}`
-    or something like that, so e.g. `-9231` works as well as
-    `1.1.0`. This is ignored by the setuptools, but has to be there.
-
-    Warnings:
-        to make pip respect the links, you have to use
-        `--process-dependency-links` switch. So e.g.:
-        `pip install --process-dependency-links {git-url}`
-
-    Returns:
-         list of packages, extras and dependency links.
-    """
+    """Reads and processes requirements files for setuptools"""
     with open(os.path.normpath('requirements/requirements.txt')) as req_file:
         defaults = [req.strip() for req in req_file.read().splitlines()]
 
@@ -103,9 +82,7 @@ def define_deps():
     full_handlers_requirements = []
     handlers_dir_path = os.path.normpath('./mindsdb/integrations/handlers')
     for fn in os.listdir(handlers_dir_path):
-        if os.path.isdir(os.path.join(handlers_dir_path, fn)) and fn.endswith(
-            "_handler"
-        ):
+        if os.path.isdir(os.path.join(handlers_dir_path, fn)) and fn.endswith("_handler"):
             extra = []
             for req_file_path in glob.glob(
                 os.path.join(handlers_dir_path, fn, "requirements*.txt")
@@ -113,11 +90,8 @@ def define_deps():
                 extra_name = fn.replace("_handler", "")
                 file_name = os.path.basename(req_file_path)
                 if file_name != "requirements.txt":
-                    extra_name += "-" + file_name.replace("requirements_", "").replace(
-                        ".txt", ""
-                    )
+                    extra_name += "-" + file_name.replace("requirements_", "").replace(".txt", "")
 
-                # If requirements.txt in our handler folder, import them as our extra's requirements
                 if os.path.exists(req_file_path):
                     with open(req_file_path) as fp:
                         extra = expand_requirements_links(
@@ -126,13 +100,9 @@ def define_deps():
 
                     extra_requirements[extra_name] = extra
                     full_handlers_requirements += extra
-
-                # Even with no requirements in our handler, list the handler as an extra (with no reqs)
                 else:
                     extra_requirements[extra_name] = []
 
-                # If this is a default extra and if we want to install defaults (enabled by default)
-                #   then add it to the default requirements needing to install
                 if (
                     MINDSDB_PIP_INSTALL_DEFAULT_EXTRAS
                     and extra_name in DEFAULT_PIP_EXTRAS
@@ -147,7 +117,6 @@ def define_deps():
     Deps.new_links = links
 
     return Deps
-
 
 deps = define_deps()
 
